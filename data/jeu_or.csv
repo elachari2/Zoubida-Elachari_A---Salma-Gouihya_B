@@ -1,0 +1,11 @@
+text,attendu,difficulte,erreur_connue
+"Super produit, mais la notice est en chinois. Heureusement que je suis ingénieur !",POSITIVE,ironie,
+"Je suis déçu, le colis est arrivé en avance et j'avais préparé mon anniversaire pour la semaine prochaine...",NEGATIVE,ironie,
+"Ce n'est vraiment pas génial, mais pour le prix, on ne peut pas trop se plaindre.",NEGATIVE,mitigé,
+"Pas mal du tout, sans plus. Je m'attendais à mieux vu les avis.",NEGATIVE,mitigé,
+"Incroyable, la batterie tient trois jours alors que je l'utilise intensément.",POSITIVE,,
+"Je l'ai acheté deux fois, la première était défectueuse, la deuxième fonctionne bien.",POSITIVE,mitigé,
+"Le vendeur m'a répondu en 2 minutes et m'a envoyé un remplaçant gratuit. Chapeau !",POSITIVE,,
+"La qualité est médiocre et le service après-vente inexistant, fuyez.",NEGATIVE,,
+"Je ne regrette pas mon achat, même si le design est un peu vieillot.",POSITIVE,mitigé,
+"On m'avait dit que c'était nul, j'ai testé, et je confirme : c'est nul.",NEGATIVE,,
