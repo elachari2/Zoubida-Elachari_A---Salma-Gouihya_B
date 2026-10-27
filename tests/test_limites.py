@@ -1,53 +1,84 @@
-"""Tests aux limites du contrat d'entrée (TP4, étape B). À COMPLÉTER.
+"""Tests aux frontières du contrat d'entrée (TP4, étape B).
 
-PredictRequest promet un champ « text », chaîne de 1 à 2000 caractères.
-Ce fichier vérifie cette promesse à ses frontières, puis au hasard (hypothesis).
+- un test paramétré de 8 cas aux frontières, qui vérifie aussi la forme du 422
+- deux propriétés hypothesis :
+  * tout texte non blanc de 1 à 2000 caractères reçoit 200, avec un label
+    du contrat et un score entre 0 et 1 ;
+  * tout texte fait de blancs reçoit 422, avec detail en liste.
 """
-import json
-from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
+from hypothesis import given, strategies as st
 
-MODELE = Path(__file__).resolve().parents[1] / "models" / "sentiment.joblib"
-pytestmark = pytest.mark.skipif(not MODELE.exists(), reason="modèle non produit : python src/train.py")
+from api.main import app
 
 
 @pytest.fixture(scope="module")
 def client():
-    """Portée « module » : l'API démarre une fois pour tout le fichier (hypothesis l'exige)."""
-    from fastapi.testclient import TestClient
-
-    from api.main import app
-
-    with TestClient(app) as c:  # le « with » exécute le lifespan : le modèle est chargé
+    """Portée module : l'API démarre une fois pour tout le fichier (hypothesis l'exige)."""
+    with TestClient(app) as c:
         yield c
 
 
-def en_json(valeur: object) -> bytes:
-    """Corps de requête JSON, sous forme d'octets : permet aussi d'envoyer un corps invalide."""
-    return json.dumps(valeur).encode("utf-8")
+# --- Test paramétré : 8 cas aux frontières -------------------------------
 
-
-# Étape B.1 : huit cas au moins, chacun avec son code attendu. Deux sont donnés.
-# À ajouter : texte fait d'espaces, un seul caractère, exactement 2000 caractères,
-# champ absent, champ d'un autre type (42), corps qui n'est pas du JSON (b"pas du json").
-CAS = [
-    pytest.param(en_json({"text": ""}), 422, id="texte-vide"),
-    pytest.param(en_json({"text": "a" * 2001}), 422, id="2001-caracteres"),
+CAS_FRONTieres = [
+    # (payload, statut attendu)
+    ({"text": ""}, 422),
+    ({"text": " "}, 422),
+    ({"text": "a"}, 200),
+    ({"text": "a" * 2000}, 200),
+    ({"text": "a" * 2001}, 422),
+    ({}, 422),
+    ({"text": 42}, 422),
+    ("pas-du-json", 422),  # sera envoyé via content=, pas json=
 ]
 
 
-@pytest.mark.parametrize("corps, code_attendu", CAS)
-def test_frontieres_du_contrat(client, corps, code_attendu):
-    reponse = client.post("/predict", content=corps, headers={"Content-Type": "application/json"})
-    assert reponse.status_code == code_attendu
-    # Étape B.2 : pour chaque 422, vérifiez aussi la FORME de la réponse :
-    # « detail » doit être la liste d'erreurs standard de FastAPI (objets avec loc, msg, type).
+@pytest.mark.parametrize("payload,attendu", CAS_FRONTieres)
+def test_frontieres_du_contrat(client, payload, attendu):
+    if isinstance(payload, str):
+        r = client.post("/predict", content=payload, headers={"content-type": "application/json"})
+    else:
+        r = client.post("/predict", json=payload)
+    assert r.status_code == attendu, f"payload={payload!r} -> {r.status_code} au lieu de {attendu}"
+    if attendu == 422:
+        detail = r.json()["detail"]
+        assert isinstance(detail, list), f"detail doit être une liste, reçu {type(detail)}"
 
 
-# Étape B.5 : deux tests de propriété avec hypothesis, dans ce fichier.
-#   from hypothesis import given, settings, strategies as st
-#   1. tout texte de 1 à 2000 caractères contenant un caractère non blanc :
-#      200, étiquette du contrat, score entre 0 et 1 ;
-#   2. tout texte fait uniquement de blancs : 422, sous la forme standard.
-# Pensez à @settings(deadline=None) : le premier appel peut être plus lent que les autres.
+# --- Propriétés hypothesis ------------------------------------------------
+
+@given(st.text(min_size=1, max_size=2000).filter(lambda s: s.strip()))
+def test_texte_non_blanc_recoit_200(texte):
+    with TestClient(app) as c:
+        r = c.post("/predict", json={"text": texte})
+    assert r.status_code == 200, f"texte={texte!r} -> {r.status_code}"
+    body = r.json()
+    assert body["label"] in {"POSITIVE", "NEGATIVE", "INDETERMINE"}
+    assert 0.0 <= body["score"] <= 1.0
+
+
+from hypothesis import given, strategies as st
+
+# Caractères considérés comme blancs par str.strip() :
+# Zs (séparateurs d'espace), Zl (séparateur de ligne), Zp (séparateur de paragraphe),
+# et les caractères de contrôle usuels (\t, \n, \r, \v, \f) qui sont dans Cc.
+BLANCS = st.text(
+    alphabet=st.characters(whitelist_categories=("Zs", "Zl", "Zp"))
+    | st.sampled_from(["\t", "\n", "\r", "\v", "\f"]),
+    min_size=1,
+    max_size=50,
+)
+
+
+@given(BLANCS)
+def test_texte_blancs_recoit_422(texte):
+    # Par construction, `texte` ne contient que des blancs : str.strip() le vide.
+    assert not texte.strip(), "le générateur a produit un texte non blanc"
+    with TestClient(app) as c:
+        r = c.post("/predict", json={"text": texte})
+    assert r.status_code == 422, f"texte={texte!r} -> {r.status_code}"
+    detail = r.json()["detail"]
+    assert isinstance(detail, list), f"detail doit être une liste, reçu {type(detail)}"
