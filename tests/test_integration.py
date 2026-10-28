@@ -10,6 +10,7 @@ pytestmark = pytest.mark.skipif(not MODELE_PATH.exists(), reason="modèle non pr
 
 def test_demarrage_reel_charge_le_modele():
     from fastapi.testclient import TestClient
+
     from api.main import app
     with TestClient(app) as client:
         reponse = client.get("/health")
@@ -19,8 +20,9 @@ def test_demarrage_reel_charge_le_modele():
 
 def test_modele_absent_refuse_demarrage(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
-    from api.main import app
+
     import api.model
+    from api.main import app
 
     monkeypatch.setattr(api.model, "MODELE", tmp_path / "absent.joblib")
     api.model.charger_modele.cache_clear()
@@ -32,6 +34,7 @@ def test_modele_absent_refuse_demarrage(monkeypatch, tmp_path):
 
 def test_panne_runtime_renvoie_500():
     from fastapi.testclient import TestClient
+
     from api.main import app
     with TestClient(app) as client:
         with patch("api.model.predict", side_effect=RuntimeError("panne critique")):
@@ -42,6 +45,7 @@ def test_panne_runtime_renvoie_500():
 
 def test_panne_valueerror_renvoie_500():
     from fastapi.testclient import TestClient
+
     from api.main import app
     with TestClient(app) as client:
         with patch("api.model.predict", side_effect=ValueError("bug interne")):

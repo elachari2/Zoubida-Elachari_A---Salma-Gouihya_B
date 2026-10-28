@@ -9,7 +9,8 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from api.main import app
 
@@ -59,8 +60,6 @@ def test_texte_non_blanc_recoit_200(texte):
     assert body["label"] in {"POSITIVE", "NEGATIVE", "INDETERMINE"}
     assert 0.0 <= body["score"] <= 1.0
 
-
-from hypothesis import given, strategies as st
 
 # Caractères considérés comme blancs par str.strip() :
 # Zs (séparateurs d'espace), Zl (séparateur de ligne), Zp (séparateur de paragraphe),

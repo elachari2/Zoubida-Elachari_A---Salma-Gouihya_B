@@ -10,7 +10,15 @@ jobs:
         with: { python-version: "3.11" }
       - name: Environnement virtuel et dépendances
         run: python -m venv .venv && . .venv/bin/activate && pip install pandas scikit-learn pytest "fastapi==0.115.*" "httpx==0.27.*"
+      - name: Outils de qualité (TP4)
+        run: . .venv/bin/activate && pip install -r requirements-dev.txt
       - name: Diagnostic
         run: . .venv/bin/activate && python scripts/check_setup.py
-      - name: Tests
-        run: . .venv/bin/activate && pytest -q
+      - name: ruff
+        run: . .venv/bin/activate && ruff check .
+      - name: mypy
+        run: . .venv/bin/activate && mypy api
+      - name: Entraîner le modèle pour les tests
+        run: . .venv/bin/activate && python src/train.py
+      - name: Tests et couverture
+        run: . .venv/bin/activate && pytest -q --cov=api --cov-report=term-missing --cov-fail-under=95
