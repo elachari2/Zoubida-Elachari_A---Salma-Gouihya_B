@@ -5,14 +5,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 
-from api.model import charger_modele, predict
+from api import model
 from api.schemas import HealthResponse, PredictRequest, PredictResponse
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Charge le modèle au démarrage. Refuse de démarrer s'il manque."""
-    charger_modele()  # lève FileNotFoundError si le modèle est absent
+    model.charger_modele()  # lève FileNotFoundError si le modèle est absent
     yield
 
 
@@ -32,11 +32,12 @@ def health():
 @app.post("/predict", response_model=PredictResponse)
 def predict_route(req: PredictRequest):
     try:
-        return predict(req.text)
+        return model.predict(req.text)
     except HTTPException:
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Erreur interne de l'API") from None
+
 
 
 if __name__ == "__main__":
