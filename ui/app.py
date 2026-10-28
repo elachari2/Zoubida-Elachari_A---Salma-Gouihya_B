@@ -1,77 +1,65 @@
-"""Interface de démonstration du classifieur de sentiment.
-
-Usage : streamlit run ui/app.py
-Prérequis : models/sentiment.joblib, produit par python src/train.py (TP2).
-"""
-from pathlib import Path
+"""Interface Streamlit cliente de l'API de sentiment."""
 
 import pandas as pd
 import streamlit as st
-from helpers import charger_predicteur, classer, predire_lot, resumer
 
-RACINE = Path(__file__).resolve().parents[1]
+from ui import client
 
 st.set_page_config(page_title="Analyse de sentiment", page_icon="💬", layout="wide")
 st.title("Analyse de sentiment des avis clients")
-st.caption("Modèle entraîné en TP2 · interface de démonstration · fil rouge du cours")
 
+if "api_session" not in st.session_state:
+    st.session_state.api_session = client.creer_session()
+session = st.session_state.api_session
 
-@st.cache_resource
-def predicteur():
-    """Chargé une seule fois, pas à chaque interaction."""
-    return charger_predicteur()
-
-
-try:
-    predire = predicteur()
-except FileNotFoundError as erreur:
-    st.error(str(erreur))
-    st.info("Dans un terminal, à la racine du dépôt : `python src/train.py --allocine`")
+etat = client.sante(session)
+if not etat.ok:
+    st.error(etat.message)
     st.stop()
 
-onglet_avis, onglet_lot, onglet_aide = st.tabs(["Un avis", "Un fichier CSV", "Comment ça marche"])
+st.caption(f"API prête : {etat.message}")
+onglet_avis, onglet_fichier, onglet_aide = st.tabs(
+    ["Un avis", "Un fichier d'avis", "Comment ça marche"]
+)
 
 with onglet_avis:
     texte = st.text_area("Avis à analyser", "Livraison rapide, produit conforme.", height=130)
     if st.button("Analyser", type="primary"):
-        if not texte.strip():
-            st.warning("Saisissez un avis.")
+        resultat = client.predire(session, texte)
+        if not resultat.ok:
+            st.warning(resultat.message)
+        elif resultat.label == "INDETERMINE":
+            st.metric(client.VERDICTS[resultat.label], f"{resultat.score:.0%}")
+            st.info("La confiance est sous le seuil d'abstention : un humain doit trancher.")
         else:
-            r = classer(texte, predire)
-            colonne_verdict, colonne_score = st.columns([2, 1])
-            with colonne_verdict:
-                if r["incertain"]:
-                    st.warning(f"À vérifier par un agent (penche vers « {r['label']} »)")
-                elif r["label"] == "negative":
-                    st.error("Avis négatif : à traiter en priorité")
-                else:
-                    st.success("Avis positif")
-            with colonne_score:
-                st.metric("Confiance", f"{r['score']:.0%}")
-            st.progress(float(r["score"]))
+            st.metric(client.VERDICTS[resultat.label], f"{resultat.score:.0%}")
 
-with onglet_lot:
-    st.write("Fichier CSV contenant une colonne `review`. Exemple fourni : `data/sample_reviews.csv`.")
+with onglet_fichier:
+    st.write("Choisissez un fichier CSV contenant une colonne `review` ou `text`.")
     fichier = st.file_uploader("Choisir un fichier", type="csv")
     if fichier is not None:
         try:
-            df = predire_lot(pd.read_csv(fichier), predire)
-        except (KeyError, ValueError) as erreur:
+            donnees = pd.read_csv(fichier)
+            colonne = "review" if "review" in donnees.columns else "text"
+            if colonne not in donnees.columns:
+                raise KeyError("Le fichier doit contenir une colonne 'review' ou 'text'.")
+        except (KeyError, pd.errors.ParserError, UnicodeDecodeError) as erreur:
             st.error(str(erreur))
         else:
-            r = resumer(df)
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Avis analysés", r["total"])
-            c2.metric("Négatifs détectés", f"{r['negatifs']} ({r['part_negatifs']} %)")
-            c3.metric("À vérifier", r["a_verifier"])
-            st.bar_chart(df["prediction"].value_counts())
-            st.dataframe(
-                df.sort_values(["prediction", "confiance"], ascending=[True, False]),
-                use_container_width=True,
-            )
+            resultats = client.predire_lot(session, donnees[colonne].fillna("").astype(str).tolist())
+            donnees["prediction"] = [
+                resultat.label if resultat.ok else "REFUS OU ERREUR" for resultat in resultats
+            ]
+            donnees["verdict"] = [
+                client.VERDICTS.get(resultat.label, resultat.message) if resultat.ok else resultat.message
+                for resultat in resultats
+            ]
+            donnees["confiance"] = [resultat.score for resultat in resultats]
+            st.write(client.resumer(resultats))
+            st.dataframe(donnees, use_container_width=True)
             st.download_button(
                 "Télécharger les résultats",
-                df.to_csv(index=False).encode("utf-8"),
+                donnees.to_csv(index=False).encode("utf-8"),
                 "resultats.csv",
                 "text/csv",
             )
@@ -79,15 +67,10 @@ with onglet_lot:
 with onglet_aide:
     st.markdown(
         """
-**Ce que fait cette interface.** Elle charge le modèle produit au TP2 et appelle sa fonction
-`predict()`, la même que celle qu'utilisera l'API. Aucune logique de prédiction n'est dupliquée ici.
+**Ce que fait cette interface.** Elle envoie les avis à l'API et traduit les réponses
+en verdicts compréhensibles. Le modèle reste chargé et utilisé côté API.
 
-**Le seuil d'incertitude.** En dessous de 60 % de confiance, la prédiction est affichée comme
-« à vérifier » plutôt que tranchée. Un modèle qui hésite doit le dire : c'est ce qui permet à un
-agent de reprendre la main, comme prévu dans la fiche de cadrage du cas 3.
-
-**Ce que l'interface n'est pas.** Une démonstration, pas l'application. Elle sert à montrer le
-modèle, à récolter des retours et à faire apparaître les cas où il se trompe. L'API, elle, sera
-appelée par d'autres programmes.
+**Le seuil d'abstention.** Quand l'API renvoie `INDETERMINE`, la confiance est sous
+le seuil d'abstention : un humain doit trancher.
         """
     )

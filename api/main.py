@@ -2,7 +2,7 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from api import model
@@ -12,7 +12,7 @@ from api.schemas import HealthResponse, PredictRequest, PredictResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Charge le modèle au démarrage. Refuse de démarrer s'il manque."""
-    model.charger_modele()  # lève FileNotFoundError si le modèle est absent
+    app.state.classifier = model.charger_modele()
     yield
 
 
@@ -30,9 +30,12 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict_route(req: PredictRequest):
+def predict_route(req: PredictRequest, request: Request):
     try:
-        return model.predict(req.text)
+        classifier = request.app.state.classifier
+        if classifier is None:
+            raise HTTPException(status_code=503, detail="Modèle non chargé")
+        return model.predict(req.text, classifier)
     except HTTPException:
         raise
     except Exception:

@@ -15,7 +15,7 @@ text,attendu,difficulte,erreur_connue
 "Super produit, conforme à la description.",POSITIVE,,,
 "Je n'ai jamais reçu ma commande, aucune réponse du vendeur.",NEGATIVE,négation,,
 "Bon rapport qualité-prix, je rachèterai.",POSITIVE,,,
-"Service client au top, réponse immédiate.",POSITIVE,,vocabulaire positif « au top » mal pondéré
+"Service client au top, réponse immédiate.",POSITIVE,,,
 "Qualité vraiment décevante pour le prix payé.",NEGATIVE,,adjectif décevant mal pondéré
 "Produit conforme, livraison dans les délais.",POSITIVE,,,
-"Vraiment nul, à éviter absolument.",NEGATIVE,,vocabulaire négatif « nul/à éviter » mal pondéré
+"Vraiment nul, à éviter absolument.",NEGATIVE,,,

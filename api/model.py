@@ -5,10 +5,12 @@ from pathlib import Path
 from typing import TypedDict
 
 import joblib
+from sklearn.pipeline import Pipeline
 
 from api.schemas import Label
 
 MODELE = Path(__file__).resolve().parents[1] / "models" / "sentiment.joblib"
+SEUIL_ABSTENTION = 0.60
 ETIQUETTES_API: dict[str, Label] = {
     "positive": "POSITIVE",
     "negative": "NEGATIVE",
@@ -22,7 +24,7 @@ class Prediction(TypedDict):
 
 
 @lru_cache(maxsize=1)
-def charger_modele():
+def charger_modele() -> Pipeline:
     """Charge le modèle et vérifie ses classes une seule fois par processus."""
     if not MODELE.exists():
         raise FileNotFoundError("models/sentiment.joblib absent : lancez python src/train.py")
@@ -33,14 +35,16 @@ def charger_modele():
     return pipeline
 
 
-def predict(texte: str) -> Prediction:
+def predict(texte: str, classifier: Pipeline | None = None) -> Prediction:
     """Renvoie la prédiction au format attendu par l'API."""
     if not isinstance(texte, str) or not texte.strip():
         raise ValueError("texte vide")
-    pipeline = charger_modele()
+    pipeline = classifier if classifier is not None else charger_modele()
     etiquette = pipeline.predict([texte])[0]
     score = float(pipeline.predict_proba([texte]).max())
     label = ETIQUETTES_API.get(str(etiquette))
     if label is None:
         raise ValueError(f"Étiquette prédite non prise en charge : {etiquette!r}")
+    if score < SEUIL_ABSTENTION:
+        label = "INDETERMINE"
     return {"label": label, "score": round(score, 4), "text": texte}

@@ -41,6 +41,9 @@ def test_predict_route_releve_les_erreurs_http(monkeypatch):
     monkeypatch.setattr(main.model, "predict", Mock(side_effect=erreur))
 
     with pytest.raises(HTTPException) as exc_info:
-        main.predict_route(main.PredictRequest(text="Un avis"))
+        request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(classifier=object()))
+        )
+        main.predict_route(main.PredictRequest(text="Un avis"), request)
 
     assert exc_info.value.status_code == 418
