@@ -19,6 +19,6 @@ jobs:
       - name: mypy
         run: . .venv/bin/activate && mypy api
       - name: Entraîner le modèle pour les tests
-        run: . .venv/bin/activate && python src/train.py
+        run: . .venv/bin/activate && python src/make_demo.py && python src/train.py
       - name: Tests et couverture
         run: . .venv/bin/activate && pytest -q --cov=api --cov-report=term-missing --cov-fail-under=95
