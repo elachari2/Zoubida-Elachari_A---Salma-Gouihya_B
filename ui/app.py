@@ -1,9 +1,16 @@
 """Interface Streamlit cliente de l'API de sentiment."""
 
+import sys
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
-from ui import client
+RACINE = Path(__file__).resolve().parents[1]
+if str(RACINE) not in sys.path:
+    sys.path.insert(0, str(RACINE))
+
+from ui import client  # noqa: E402
 
 st.set_page_config(page_title="Analyse de sentiment", page_icon="💬", layout="wide")
 st.title("Analyse de sentiment des avis clients")
