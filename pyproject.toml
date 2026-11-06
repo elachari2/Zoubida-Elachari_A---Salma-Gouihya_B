@@ -1,4 +1,34 @@
-# Configuration des outils de qualité (TP4). Le packaging (TP6) complétera ce fichier.
+# Configuration des outils de qualité (TP4) et du packaging (TP6).
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentiment-app"
+dynamic = ["version"]
+requires-python = ">=3.11"
+description = "Classificateur d'avis clients français (positif / négatif)"
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn>=0.30,<0.31",
+    "scikit-learn>=1.5,<1.6",
+    "httpx>=0.27,<0.28",
+    "pydantic>=2.7,<2.8",
+    "streamlit>=1.35,<1.36",
+    "joblib>=1.4,<1.5",
+]
+
+[project.scripts]
+sentiment = "sentiment_app.cli:main"
+
+[tool.setuptools]
+packages = ["sentiment_app", "api", "ui"]
+package-dir = { "sentiment_app" = "." }
+
+[tool.setuptools.dynamic]
+version = { attr = "sentiment_app.__version__" }
+
 
 [tool.ruff]
 target-version = "py311"
@@ -11,7 +41,8 @@ select = ["E4", "E7", "E9", "F", "I", "B"]
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = "src"            # pour que mypy trouve predict.py, importé par api/model.py
+explicit_package_bases = true
+mypy_path = "src"
 check_untyped_defs = true
 warn_unused_ignores = true
 
