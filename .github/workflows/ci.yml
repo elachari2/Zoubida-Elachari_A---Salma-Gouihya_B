@@ -22,3 +22,10 @@ jobs:
         run: . .venv/bin/activate && python src/make_demo.py && python src/train.py
       - name: Tests et couverture
         run: . .venv/bin/activate && pytest -q --cov=api --cov-report=term-missing --cov-fail-under=95
+      - name: Construire la roue (TP6)
+        run: . .venv/bin/activate && python -m build --wheel
+
+      - name: Roue installée hors du dépôt (TP6)
+        run: |
+          . .venv/bin/activate && python -m venv /tmp/roue && /tmp/roue/bin/pip install dist/*.whl
+          cd /tmp && SENTIMENT_MODELE="$GITHUB_WORKSPACE/models/sentiment.joblib" /tmp/roue/bin/sentiment predict "Livraison rapide, produit conforme, très satisfait"
